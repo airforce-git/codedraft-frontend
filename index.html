@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CodeDraft — AI 技术博客生成器</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&family=Fira+Code&display=swap" rel="stylesheet">
+  <!-- Highlight.js CSS (动态切换) -->
+  <link id="hljs-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <!-- JS Dependencies (使用传统CDN脚本) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+  <script>
+    
+    // 配置 marked.js
+    marked.setOptions({
+      gfm: true,
+      breaks: true,
+      highlight: (code, lang) => {
+        if (lang && hljs.getLanguage(lang)) {
+          return hljs.highlight(code, { language: lang }).value;
+        }
+        return hljs.highlightAuto(code).value;
+      }
+    });
+    
+    // 主题切换函数
+    const setHighlightTheme = () => {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.getElementById('hljs-theme').href = isDark
+        ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css'
+        : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+    };
+    setHighlightTheme();
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setHighlightTheme);
+    
+    // 主应用逻辑
+    document.addEventListener('DOMContentLoaded', () => {
+      const topicInput = document.getElementById('topicInput');
+      const generateBtn = document.getElementById('generateBtn');
+      const statusEl = document.getElementById('status');
+      const outputEl = document.getElementById('output');
+      
+      topicInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') generateBlog();
+      });
+      
+      generateBtn.addEventListener('click', generateBlog);
+      
+      async function generateBlog() {
+        const topic = topicInput.value.trim();
+        if (!topic) {
+          statusEl.textContent = '请输入一个技术主题';
+          statusEl.style.color = '#ef4444';
+          return;
+        }
+        
+        statusEl.textContent = '正在生成中...请稍候（首次请求可能较慢）';
+        statusEl.style.color = '#3b82f6';
+        generateBtn.disabled = true;
+        outputEl.innerHTML = '';
+        
+        try {
+          const response = await fetch('http://localhost:5001/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic })
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`请求失败: ${errorText}`);
+          }
+          
+          const data = await response.json();
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          const dirtyHtml = marked.parse(data.content);
+          const cleanHtml = DOMPurify.sanitize(dirtyHtml, { USE_PROFILES: { html: true } });
+          outputEl.innerHTML = cleanHtml;
+          
+          // 重新高亮
+          outputEl.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+          });
+          
+          statusEl.textContent = '✅ 生成成功！';
+          statusEl.style.color = '#10b981';
+        } catch (err) {
+          console.error('生成失败:', err);
+          statusEl.textContent = `❌ 错误: ${err.message}`;
+          statusEl.style.color = '#ef4444';
+        } finally {
+          generateBtn.disabled = false;
+        }
+      }
+    });
+  </script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --card-bg: #fafafa;
+      --text: #1f2937;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --border: #e5e7eb;
+      --success: #10b981;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #f1f5f9;
+        --border: #334155;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #4f46e5, #7c3aed);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      color: #64748b;
+      font-size: 1.1rem;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.875rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      background: var(--card-bg);
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--primary);
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.875rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    #status {
+      min-height: 1.5rem;
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+      color: var(--success);
+    }
+
+    #output {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      font-size: 1rem;
+      line-height: 1.7;
+      overflow-wrap: break-word;
+    }
+
+    #output h1,
+    #output h2,
+    #output h3 {
+      margin: 1.5rem 0 1rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    #output p {
+      margin-bottom: 1rem;
+    }
+
+    #output ul,
+    #output ol {
+      margin-left: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    /* ===== 修复：代码块样式（关键部分） ===== */
+    #output pre {
+      border-radius: 8px;
+      padding: 1.2rem;
+      overflow-x: auto;
+      margin: 1.2rem 0;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* 亮色模式：GitHub 风格 */
+    @media (prefers-color-scheme: light) {
+      #output pre {
+        background-color: #f6f8fa;
+        color: #24292e;
+      }
+    }
+
+    /* 暗色模式：GitHub Dark 风格 */
+    @media (prefers-color-scheme: dark) {
+      #output pre {
+        background-color: #1e293b;
+        color: #c9d1d9;
+      }
+    }
+
+    /* 手机端优化 */
+    @media (max-width: 600px) {
+      #output pre {
+        font-size: 15px;
+        padding: 1rem;
+      }
+    }
+
+    /* 行内代码（不覆盖语法高亮） */
+    #output code:not(pre > code) {
+      background: rgba(175, 184, 193, 0.2);
+      padding: 0.2em 0.4em;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.95em;
+      color: var(--text);
+    }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: #94a3b8;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .input-group {
+        flex-direction: column;
+      }
+      body {
+        padding: 1.5rem 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🚀 CodeDraft</h1>
+    <p class="subtitle">输入技术主题，AI 自动生成结构化博客草稿</p>
+  </header>
+
+  <div class="input-group">
+    <input type="text" id="topicInput" placeholder="例如：如何用 Rust 构建高性能 Web 服务？" />
+    <button id="generateBtn">生成博客</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="output"></div>
+  <p class="footer-note">本文由 CodeDraft 生成，请人工校对。</p>
+
+
+</body>
+</html>
